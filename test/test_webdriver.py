@@ -7,3 +7,4 @@ class WebDriverCreateTestCase(unittest.TestCase):
         driver = FirefoxWebDriver()
         self.assertHasAttr(driver, 'service')
         self.assertHasAttr(driver, 'driver')
+        driver.quit()
