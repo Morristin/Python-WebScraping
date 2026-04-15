@@ -1,6 +1,8 @@
 import abc
+import hashlib
 import subprocess
 import logging
+from pathlib import Path
 from sys import platform
 
 from selenium import webdriver
@@ -47,11 +49,41 @@ class WebDriver(abc.ABC):
 
     @abc.abstractmethod
     def __init__(self):
-        pass
+        # TODO: 从本地文件当中读取全局设置
+        self._implicitly_wait = 5
+
+        # These arguments are set to None, standing for that
+        # they are required to initialize by each subclass's implement.
+        self.service = None
+        self.driver = None
 
     @abc.abstractmethod
     def quit(self):
         pass
+
+    def get(self, url: str, ignore_cache: bool = False, store_to_cache: bool = True) -> str:
+        """
+        Connect to the given url, and return the string format of page source file.
+
+        This function use cache mechanism to store recent websites' content.
+        If the website is dynamic, may set `ignore_cache` to True to get the newest content.
+        """
+        cache_filename = hashlib.md5(url.encode()).hexdigest()[:12] + '.html'
+        if (Path('cache') / cache_filename).exists() and not ignore_cache:
+            with open(Path('cache') / cache_filename, 'r') as cache:
+                page_source = cache.read()
+            logging.debug(f'Load page source from cache: {url}')
+        else:
+            self.driver.get(url)
+            logging.info(f'Successfully connected to {url}.')
+            page_source = self.driver.page_source
+
+            if store_to_cache:
+                with open(Path('cache') / cache_filename, 'x') as cache:
+                    cache.write(page_source)
+                logging.debug(f'Successfully store page source of {url} to file: {cache_filename}')
+
+        return page_source
 
 
 class FirefoxWebDriver(WebDriver):
@@ -62,6 +94,8 @@ class FirefoxWebDriver(WebDriver):
     """
 
     def __init__(self):
+        super().__init__()
+
         # TODO: 按照设置决定是否需要优先使用本地驱动，或者将本地驱动作为在线驱动下载失败备选方案。
         self.service = webdriver.FirefoxService(executable_path=self.find_webdriver_path('geckodriver'))
         logging.debug('Successfully create firefox service.')
@@ -83,6 +117,8 @@ class SafariWebDriver(WebDriver):
         """ Try to create safari web driver on a platform which is not macOS. """
 
     def __init__(self):
+        super().__init__()
+
         if platform != 'darwin':
             logging.error('Try to create Safari web driver on a platform which is not macOS.')
             raise self.PlatformError(self.PlatformError.__doc__)
