@@ -4,6 +4,7 @@ import logging
 from sys import platform
 
 from selenium import webdriver
+from selenium.common.exceptions import SessionNotCreatedException
 
 
 class WebDriver(abc.ABC):
@@ -17,7 +18,7 @@ class WebDriver(abc.ABC):
         """ Can not find where the local web driver exist. """
 
     @staticmethod
-    def find_webdriver_path(webdriver_name) -> str | None:
+    def find_webdriver_path(webdriver_name) -> str:
         """ Try to find where the local web driver is. **Only work with macOS and Linux**. """
         if platform in ('darwin', 'linux'):
             try:
@@ -27,10 +28,10 @@ class WebDriver(abc.ABC):
                 raise NotImplementedError(
                     'Can not call function "find_webdriver_path" without specific web driver name.')
             except TimeoutError:
-                logging.warning(f'Time out when search local web driver path: "which {webdriver_name}" time out.')
+                logging.debug(f'Time out when search local web driver path: "which {webdriver_name}" time out.')
                 raise TimeoutError('Time out when search local web driver path.')
             except subprocess.CalledProcessError:
-                logging.error(f'Failed to find the local web driver: {webdriver_name}')
+                logging.debug(f'Failed to find the local web driver: {webdriver_name}')
                 raise WebDriver.LocalWebDriverNotFoundError()
             else:
                 if subprocess_result.stdout is not None:
@@ -38,7 +39,7 @@ class WebDriver(abc.ABC):
                     logging.info(f'Successfully find the path of local {webdriver_name} web driver: {path}')
                     return path
                 else:
-                    logging.error(f'Local web driver may not exist: {webdriver_name}')
+                    logging.warning(f'Local web driver may not exist: {webdriver_name}')
                     raise WebDriver.LocalWebDriverNotFoundError()
         else:
             logging.warning(f'Current platform does not support automatically find web driver: {platform}')
@@ -55,7 +56,7 @@ class WebDriver(abc.ABC):
 
 class FirefoxWebDriver(WebDriver):
     """
-    A custom webdriver, whose core is provided by *geckodriver* from *mozilla*.
+    A webdriver whose core is provided by *geckodriver* from *mozilla*.
 
     Visit https://firefox-source-docs.mozilla.org/testing/geckodriver/index.html for more information.
     """
@@ -63,7 +64,40 @@ class FirefoxWebDriver(WebDriver):
     def __init__(self):
         # TODO: 按照设置决定是否需要优先使用本地驱动，或者将本地驱动作为在线驱动下载失败备选方案。
         self.service = webdriver.FirefoxService(executable_path=self.find_webdriver_path('geckodriver'))
+        logging.debug('Successfully create firefox service.')
         self.driver = webdriver.Firefox(service=self.service)
+        logging.debug('Successfully create firefox web driver.')
+
+    def quit(self):
+        self.driver.quit()
+
+
+class SafariWebDriver(WebDriver):
+    """
+    A webdriver whose core is provided by *Safari* from *Apple*.
+
+    Visit https://developer.apple.com/documentation/webkit/about-webdriver-for-safari#2957227 for more information.
+    """
+
+    class PlatformError(Exception):
+        """ Try to create safari web driver on a platform which is not macOS. """
+
+    def __init__(self):
+        if platform != 'darwin':
+            logging.error('Try to create Safari web driver on a platform which is not macOS.')
+            raise self.PlatformError(self.PlatformError.__doc__)
+
+        self.service = webdriver.SafariService(executable_path=self.find_webdriver_path('safaridriver'))
+        logging.debug('Successfully create safari service.')
+        try:
+            self.driver = webdriver.Safari(service=self.service)
+        except SessionNotCreatedException:
+            print('Please execute command "safaridriver --enable" first,\n'
+                  'or manually toggle "Allow Remote Automation" in developer section of setting on.')
+            logging.warning('Failed to create safari web driver, as safari driver is not enabled yet.')
+            exit()  # TODO: 可能需要更多的处理保证所有数据处于合法状态。
+        else:
+            logging.debug('Successfully create safari web driver.')
 
     def quit(self):
         self.driver.quit()
