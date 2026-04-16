@@ -1,4 +1,4 @@
-from framework.webdriver import FirefoxWebDriver, SafariWebDriver
+from webdriver.webdriver import FirefoxWebDriver, SafariWebDriver
 import unittest
 
 

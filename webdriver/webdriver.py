@@ -30,10 +30,10 @@ class WebDriver(abc.ABC):
                 raise NotImplementedError(
                     'Can not call function "find_webdriver_path" without specific web driver name.')
             except TimeoutError:
-                logging.debug(f'Time out when search local web driver path: "which {webdriver_name}" time out.')
+                logging.warning(f'Time out when search local web driver path: "which {webdriver_name}" time out.')
                 raise TimeoutError('Time out when search local web driver path.')
             except subprocess.CalledProcessError:
-                logging.debug(f'Failed to find the local web driver: {webdriver_name}')
+                logging.warning(f'Failed to find the local web driver: {webdriver_name}')
                 raise WebDriver.LocalWebDriverNotFoundError()
             else:
                 if subprocess_result.stdout is not None:
@@ -44,7 +44,8 @@ class WebDriver(abc.ABC):
                     logging.warning(f'Local web driver may not exist: {webdriver_name}')
                     raise WebDriver.LocalWebDriverNotFoundError()
         else:
-            logging.warning(f'Current platform does not support automatically find web driver: {platform}')
+            # TODO: 若需要更改本地驱动使用优先级，同时需要更改此处代码
+            logging.error(f'Current platform does not support automatically find web driver: {platform}')
             raise NotImplementedError('Current platform does not support automatically find web driver.')
 
     @abc.abstractmethod
@@ -80,7 +81,7 @@ class FirefoxWebDriver(WebDriver):
         self.service = webdriver.FirefoxService(executable_path=self.find_webdriver_path('geckodriver'))
         logging.debug('Successfully create firefox service.')
         self.driver = webdriver.Firefox(service=self.service)
-        logging.debug('Successfully create firefox web driver.')
+        logging.info('Successfully create firefox web driver.')
 
 
 class SafariWebDriver(WebDriver):
@@ -107,7 +108,7 @@ class SafariWebDriver(WebDriver):
         except SessionNotCreatedException:
             print('Please execute command "safaridriver --enable" first,\n'
                   'or manually toggle "Allow Remote Automation" in developer section of setting on.')
-            logging.warning('Failed to create safari web driver, as safari driver is not enabled yet.')
+            logging.error('Failed to create safari web driver, as safari driver is not enabled yet.')
             exit()  # TODO: 可能需要更多的处理保证所有数据处于合法状态。
         else:
-            logging.debug('Successfully create safari web driver.')
+            logging.info('Successfully create safari web driver.')
