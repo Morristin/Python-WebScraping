@@ -1,12 +1,12 @@
 import abc
-import hashlib
 import subprocess
 import logging
-from pathlib import Path
 from sys import platform
 
 from selenium import webdriver
 from selenium.common.exceptions import SessionNotCreatedException
+
+logging.getLogger(__name__)
 
 
 class WebDriver(abc.ABC):
@@ -57,33 +57,13 @@ class WebDriver(abc.ABC):
         self.service = None
         self.driver = None
 
-    @abc.abstractmethod
     def quit(self):
-        pass
+        self.driver.quit()
 
-    def get(self, url: str, ignore_cache: bool = False, store_to_cache: bool = True) -> str:
-        """
-        Connect to the given url, and return the string format of page source file.
-
-        This function use cache mechanism to store recent websites' content.
-        If the website is dynamic, may set `ignore_cache` to True to get the newest content.
-        """
-        cache_filename = hashlib.md5(url.encode()).hexdigest()[:12] + '.html'
-        if (Path('cache') / cache_filename).exists() and not ignore_cache:
-            with open(Path('cache') / cache_filename, 'r') as cache:
-                page_source = cache.read()
-            logging.debug(f'Load page source from cache: {url}')
-        else:
-            self.driver.get(url)
-            logging.info(f'Successfully connected to {url}.')
-            page_source = self.driver.page_source
-
-            if store_to_cache:
-                with open(Path('cache') / cache_filename, 'x') as cache:
-                    cache.write(page_source)
-                logging.debug(f'Successfully store page source of {url} to file: {cache_filename}')
-
-        return page_source
+    def get(self, url: str) -> str:
+        self.driver.get(url)
+        logging.info(f'Successfully connected to {url}.')
+        return self.driver.page_source
 
 
 class FirefoxWebDriver(WebDriver):
@@ -101,9 +81,6 @@ class FirefoxWebDriver(WebDriver):
         logging.debug('Successfully create firefox service.')
         self.driver = webdriver.Firefox(service=self.service)
         logging.debug('Successfully create firefox web driver.')
-
-    def quit(self):
-        self.driver.quit()
 
 
 class SafariWebDriver(WebDriver):
@@ -134,6 +111,3 @@ class SafariWebDriver(WebDriver):
             exit()  # TODO: 可能需要更多的处理保证所有数据处于合法状态。
         else:
             logging.debug('Successfully create safari web driver.')
-
-    def quit(self):
-        self.driver.quit()
