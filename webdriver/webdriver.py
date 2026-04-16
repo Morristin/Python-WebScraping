@@ -16,37 +16,32 @@ class WebDriver(abc.ABC):
     Visit https://www.selenium.dev/ for more information about selenium.
     """
 
-    class LocalWebDriverNotFoundError(Exception):
-        """ Can not find where the local web driver exist. """
-
     @staticmethod
-    def find_webdriver_path(webdriver_name) -> str:
-        """ Try to find where the local web driver is. **Only work with macOS and Linux**. """
+    def find_webdriver_path(webdriver_name: str) -> str | None:
+        """
+        Try to find where the local web driver is. **Only work with macOS and Linux**.
+
+        If no local web driver found or system doesn't match requirement,
+        return `None` to let selenium automatically download web driver.
+        """
         if platform in ('darwin', 'linux'):
             try:
-                subprocess_result = subprocess.run(['which', webdriver_name], capture_output=True, timeout=1,
-                                                   check=True)
-            except NameError:
-                raise NotImplementedError(
-                    'Can not call function "find_webdriver_path" without specific web driver name.')
+                result = subprocess.run(['which', webdriver_name], capture_output=True, timeout=1, check=True)
             except TimeoutError:
                 logging.warning(f'Time out when search local web driver path: "which {webdriver_name}" time out.')
-                raise TimeoutError('Time out when search local web driver path.')
             except subprocess.CalledProcessError:
                 logging.warning(f'Failed to find the local web driver: {webdriver_name}')
-                raise WebDriver.LocalWebDriverNotFoundError()
             else:
-                if subprocess_result.stdout is not None:
-                    path = subprocess_result.stdout.decode().strip().split('\n')[0]
+                if result.stdout is not None:
+                    path = result.stdout.decode().strip().split('\n')[0]
                     logging.info(f'Successfully find the path of local {webdriver_name} web driver: {path}')
                     return path
                 else:
                     logging.warning(f'Local web driver may not exist: {webdriver_name}')
-                    raise WebDriver.LocalWebDriverNotFoundError()
         else:
-            # TODO: 若需要更改本地驱动使用优先级，同时需要更改此处代码
-            logging.error(f'Current platform does not support automatically find web driver: {platform}')
-            raise NotImplementedError('Current platform does not support automatically find web driver.')
+            logging.warning(f'Current platform does not support automatically find web driver: {platform}')
+
+        return None
 
     @abc.abstractmethod
     def __init__(self):
@@ -77,7 +72,6 @@ class FirefoxWebDriver(WebDriver):
     def __init__(self):
         super().__init__()
 
-        # TODO: 按照设置决定是否需要优先使用本地驱动，或者将本地驱动作为在线驱动下载失败备选方案。
         self.service = webdriver.FirefoxService(executable_path=self.find_webdriver_path('geckodriver'))
         logging.debug('Successfully create firefox service.')
         self.driver = webdriver.Firefox(service=self.service)

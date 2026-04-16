@@ -17,14 +17,14 @@ class HTMLProcessor(abc.ABC):
         if len(content.strip()) != 0:
             self.content = BeautifulSoup(content, self.parser)
         else:
-            logging.debug(f'Create HTML Processor failed with content: {content}')
+            logging.debug(f'Create HTML Processor failed with content: {content}.')
             raise ValueError('No valid content or url is given for HTML Processor.')
 
     def from_file(self, file: Path, url: str):
         with open(file) as cache:
             self.url, self.file = url, file
             self.content = BeautifulSoup(cache.read(), self.parser)
-            logging.debug(f'Successfully read {url} cache file: {file}')
+            logging.debug(f'Successfully read {url} cache file: {file}.')
 
     def __repr__(self):
         if self.file is not None:
