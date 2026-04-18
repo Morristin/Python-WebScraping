@@ -1,5 +1,6 @@
-from webdriver.webdriver import FirefoxWebDriver, SafariWebDriver
 import unittest
+
+from web_scraping.webdriver.webdriver import FirefoxWebDriver, SafariWebDriver
 
 
 class WebDriverCreateTestCase(unittest.TestCase):

@@ -41,4 +41,4 @@ pip install -r requirements.txt
 
 ### LICENSE
 
-This project is liensed under the [MIT License](LICENSE.md).
+This project is licensed under the [MIT License](LICENSE.md).

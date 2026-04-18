@@ -3,15 +3,16 @@ import hashlib
 import logging
 from pathlib import Path
 
-from webdriver.html_processor import ManManBuySearchResultProcessor
-from webdriver.webdriver import FirefoxWebDriver
+from database.data_manager import GoodManager
+from web_scraping.processor.html_processor import ManManBuySearchResultProcessor
+from web_scraping.webdriver.webdriver import FirefoxWebDriver
 
 logging.getLogger(__name__)
 
 
 class Spider(abc.ABC):
     """
-    A general spider model for collecting and analyzing digital trade data.
+    A general web_scraping model for collecting and analyzing digital trade data.
     """
     _website_url = None
     _search_url = None
@@ -22,10 +23,24 @@ class Spider(abc.ABC):
             raise AttributeError('Attribute "website_url" and "search_url" must be defined first in class.')
 
         self.webdriver = FirefoxWebDriver()  # TODO: 根据外部设置文件决定所使用的 Web Driver.
-        self.data = list()
+        self.data_manager = GoodManager()
 
     def stop(self):
         self.webdriver.quit()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """
+        Spider implement context management protocol so it can be used in `with` statement.
+        When context manager exist, Spider will make sure web driver stop as expected.
+
+        However, **Spider won't deal with any exception**, and it'll directly raise them.
+        """
+        self.stop()
+        if exc_type is not None:
+            raise exc_type(exc_val)
 
     def __repr__(self):
         return f'<{self.__class__.__name__} work on {self._website_url}>'
@@ -71,3 +86,5 @@ class ManManBuySpider(Spider):
     def search(self, keyword: str):
         url = self._search_url.format(keyword)
         processor = ManManBuySearchResultProcessor(self.get(url), url)
+        for good in processor.get_goods():
+            self.data_manager.add_good(good)

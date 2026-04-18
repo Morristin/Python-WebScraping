@@ -1,6 +1,6 @@
 import abc
-import subprocess
 import logging
+import subprocess
 from sys import platform
 
 from selenium import webdriver
