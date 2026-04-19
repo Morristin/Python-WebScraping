@@ -28,20 +28,6 @@ class Spider(abc.ABC):
     def stop(self):
         self.webdriver.quit()
 
-    def __enter__(self):
-        return self
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        """
-        Spider implement context management protocol so it can be used in `with` statement.
-        When context manager exist, Spider will make sure web driver stop as expected.
-
-        However, **Spider won't deal with any exception**, and it'll directly raise them.
-        """
-        self.stop()
-        if exc_type is not None:
-            raise exc_type(exc_val)
-
     def __repr__(self):
         return f'<{self.__class__.__name__} work on {self._website_url}>'
 
@@ -50,28 +36,33 @@ class Spider(abc.ABC):
 
     @staticmethod
     def cache_file(url: str) -> Path:
-        return Path(hashlib.md5(url.encode()).hexdigest()[:12] + '.html')
+        return Path('.cache') / Path(hashlib.md5(url.encode()).hexdigest()[:12] + '.html')
 
-    def get(self, url: str, ignore_cache: bool = False, store_to_cache: bool = True) -> str:
+    def get(self, url: str, use_cache: bool = True) -> str:
         """
         Connect to the given url, and return the string format of page source file.
 
         This function use cache mechanism to store recent websites' content.
-        If the website is dynamic, may set `ignore_cache` to True to get the newest content.
+        you can change the value of argument `use_cache` to control whether to use cache mechanism.
         """
-        cache_filename = self.cache_file(url)
-        if (Path('cache') / cache_filename).exists() and not ignore_cache:
-            with open(Path('cache') / cache_filename, 'r') as cache:
-                page_source = cache.read()
-            logging.debug(f'Load page source from cache: {url}')
+        cache_path = self.cache_file(url)
+
+        if use_cache:
+            if cache_path.exists():
+                # Directly load page cache.
+                cache_file = open(cache_path, 'r')
+                page_source = cache_file.read()
+                logging.debug(f'Load {url} page source from .cache: {cache_path}')
+            else:
+                # Get page and store as a cache.
+                page_source = self.webdriver.get(url)
+                cache_file = open(cache_path, 'x')
+                cache_file.write(page_source)
+                logging.debug(f'Store {url} page source to file: {cache_path}')
+            cache_file.close()
+
         else:
             page_source = self.webdriver.get(url)
-
-            if store_to_cache:
-                with open(Path('cache') / cache_filename, 'x') as cache:
-                    cache.write(page_source)
-                logging.debug(f'Successfully store page source of {url} to file: {cache_filename}')
-
         return page_source
 
     @abc.abstractmethod
@@ -81,10 +72,12 @@ class Spider(abc.ABC):
 
 class ManManBuySpider(Spider):
     _website_url = 'https://www.manmanbuy.com/'
-    _search_url = 'https://s.manmanbuy.com/pc/search/result?keyword={}'
+    _search_url = 'https://s.manmanbuy.com/pc/search/result?keyword={}&pageId={}'
 
-    def search(self, keyword: str):
-        url = self._search_url.format(keyword)
-        processor = ManManBuySearchResultProcessor(self.get(url), url)
-        for good in processor.get_goods():
-            self.data_manager.add_good(good)
+    def search(self, keyword: str, page_limit: int = 1):
+        for page in range(1, page_limit + 1):
+            url = self._search_url.format(keyword, page)
+            processor = ManManBuySearchResultProcessor(self.get(url), url)
+            for good in processor.get_goods():
+                self.data_manager.add_good(
+                    GoodManager.Good(name=good.name, price=good.price, date=good.date, platform=good.platform))

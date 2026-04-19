@@ -1,11 +1,9 @@
 import abc
 import logging
-from pathlib import Path
-from typing import Generator
+from typing import Generator, NamedTuple
 
 import bs4
 
-from database.data_manager import Good
 from web_scraping.processor.data_processor import *
 
 logging.getLogger(__name__)
@@ -33,8 +31,8 @@ class HTMLProcessor(abc.ABC):
     """
     parser = 'lxml'
 
-    def __init__(self, content: str = '', url: str = None):
-        self.url, self.file = url, None
+    def __init__(self, content: str, url: str = None):
+        self.url = url
 
         if len(content.strip()) != 0:
             self.content = bs4.BeautifulSoup(content, self.parser)
@@ -42,21 +40,14 @@ class HTMLProcessor(abc.ABC):
             logging.debug(f'Create HTML Processor failed with content: {content}.')
             raise ValueError('No valid content or url is given for HTML Processor.')
 
-    def from_file(self, file: Path, url: str):
-        with open(file) as cache:
-            self.url, self.file = url, file
-            self.content = bs4.BeautifulSoup(cache.read(), self.parser)
-            logging.debug(f'Successfully read {url} cache file: {file}.')
-
     def __repr__(self):
-        if self.file is not None:
-            return f'<{self.__class__.__name__} on {self.url} at {self.file}>'
-        else:
-            return f'<{self.__class__.__name__} on {self.url}>'
+        return f'<{self.__class__.__name__} on {self.url}>'
 
 
 class ManManBuySearchResultProcessor(HTMLProcessor):
     """ An HTML Processor made for 慢慢买 search result. """
+
+    Good = NamedTuple('Good', [('name', str), ('price', int | float), ('date', dt.datetime), ('platform', str)])
 
     def get_goods(self, limit: int | None = None) -> Generator[Good]:
         goods = self.content.find_all('div', limit=limit, class_=re.compile(r'DiscountItem.*itemContent'))
@@ -65,4 +56,4 @@ class ManManBuySearchResultProcessor(HTMLProcessor):
             price = format_price(get_text(good.find('div', class_=re.compile(r'DiscountItem.*itemSubTitle'))))
             date = format_date(get_text(good.find('span', class_=re.compile(r'DiscountItem.*itemTime'))))
             platform = get_text(good.find('span', class_=re.compile(r'DiscountItem.*itemMall')))
-            yield Good(name=name, price=price, date=date, platform=platform)
+            yield self.Good(name=name, price=price, date=date, platform=platform)

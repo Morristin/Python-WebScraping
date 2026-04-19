@@ -7,8 +7,6 @@ from typing import NamedTuple
 
 logging.getLogger(__name__)
 
-Good = NamedTuple('Good', [('name', str), ('price', int | float), ('date', dt.datetime), ('platform', str)])
-
 
 class GoodManager:
     """
@@ -18,15 +16,22 @@ class GoodManager:
     as they no longer need to keep data themselves.
     """
 
-    def __init__(self):
-        database_path = Path('database/goods.sqlite')
+    Good = NamedTuple('Good', [('name', str), ('price', int | float), ('date', dt.datetime), ('platform', str)])
+
+    def __init__(self, database_path: Path = Path('database/goods.sqlite')):
+        database_path.touch()  # Ensure database is existed before connect.
         self.database = sqlite3.connect(database_path, autocommit=True)
         self.cursor = self.database.cursor()
 
     def _store_good(self, good_id: str, name: str, price: int | float, date: dt.datetime, platform: str):
-        """ This function store good in a safe way to prevent sqlite injection. """
+        """
+        This function store goods in a safe way to prevent sqlite injection.
+
+        Attention, default datetime adapter of sqlite3 is deprecated as of Python 3.12,
+        so this class convert `datetime` into text for easier store and read.
+        """
         command = 'INSERT INTO Goods (ID, Name, Price, Date, Platform) VALUES (?, ?, ?, ?, ?)'
-        data = (good_id, name, price, date, platform)
+        data = (good_id, name, price, date.isoformat(), platform)
 
         try:
             self.database.execute(command, data)
