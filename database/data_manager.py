@@ -36,9 +36,15 @@ class GoodManager:
         try:
             self.database.execute(command, data)
         except sqlite3.OperationalError:
+            # Database has not been created yet. Directly create it.
             self.database.execute(
                 'CREATE TABLE Goods (ID varchar(32) PRIMARY KEY, Name varchar(80), Price float, Date datetime, Platform varchar(30))')
+            logging.info('Create table Goods.')
             self.database.execute(command, data)
+        except sqlite3.IntegrityError:
+            # Goods.ID doesn't match UNIQUE requirement.
+            # Which means the same data is stored twice, just ignore it.
+            pass
 
     def add_good(self, good: Good):
         good_id = hashlib.md5((good.name + good.date.isoformat()).encode()).hexdigest()

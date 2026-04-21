@@ -1,0 +1,46 @@
+import argparse
+import datetime as dt
+
+from web_scraping.spider import *
+
+logging.getLogger(__name__)
+
+parser = argparse.ArgumentParser(
+    prog='main.py',
+    description='Search the price of the good given and store to database.')
+
+parser.add_argument('-S', '--search', action='store', default=None,
+                    metavar='Good Name', help='Specific the name of the good')
+parser.add_argument('--limit', action='store', default=1, type=int,
+                    metavar='n', help='Limit the number of pages read from search result')
+parser.add_argument('--version', action='version', version='WebScraping Preview Version',
+                    help='Print the version of the program')
+
+
+def parse_args(args: argparse.Namespace):
+    search = args.search
+    if search is None:
+        search = input('Please enter the good you want to search: ')
+        if len(search.strip()) == 0:
+            print('You must enter a valid good name.')
+            logging.error(f'User enter an invalid good name. Program exit.')
+            exit()
+        else:
+            args.search = search
+            logging.info(f'Get good name from user input: {search}')
+    else:
+        logging.info(f'Get good name from args: {search}')
+
+    return args
+
+
+if __name__ == '__main__':
+    logging.basicConfig(filename=Path(f'log/{dt.date.today()}.log'),
+                        format="%(asctime)s : %(levelname)-7s : %(name)s : %(message)s",
+                        level=logging.INFO)
+
+    program_args = parse_args(parser.parse_args())
+    spider = ManManBuySpider()
+    spider.search(program_args.search, program_args.limit)
+    print(f'Successfully search good {program_args.search} and store its prices to database.')
+    spider.quit()

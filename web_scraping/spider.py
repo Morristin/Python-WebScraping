@@ -25,7 +25,7 @@ class Spider(abc.ABC):
         self.webdriver = FirefoxWebDriver()  # TODO: 根据外部设置文件决定所使用的 Web Driver.
         self.data_manager = GoodManager()
 
-    def stop(self):
+    def quit(self):
         self.webdriver.quit()
 
     def __repr__(self):
@@ -52,13 +52,13 @@ class Spider(abc.ABC):
                 # Directly load page cache.
                 cache_file = open(cache_path, 'r')
                 page_source = cache_file.read()
-                logging.debug(f'Load {url} page source from .cache: {cache_path}')
+                logging.info(f'Load {url} page source from .cache: {cache_path}')
             else:
                 # Get page and store as a cache.
                 page_source = self.webdriver.get(url)
                 cache_file = open(cache_path, 'x')
                 cache_file.write(page_source)
-                logging.debug(f'Store {url} page source to file: {cache_path}')
+                logging.info(f'Store {url} page source to file: {cache_path}')
             cache_file.close()
 
         else:

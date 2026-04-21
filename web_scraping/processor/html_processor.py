@@ -1,25 +1,9 @@
 import abc
-import logging
 from typing import Generator, NamedTuple
-
-import bs4
 
 from web_scraping.processor.data_processor import *
 
 logging.getLogger(__name__)
-
-
-def get_text(tag: bs4.element.Tag | None) -> str:
-    """ Apply get_text() method on argument, and format text for further operations. """
-    if tag is not None:
-        text = tag.get_text()
-    else:
-        raise ValueError('Can not get information from: {tag}')
-
-    unwanted_char = ('\n', '，', '。', '、')
-    for char in unwanted_char:
-        text = text.replace(char, ' ')
-    return ' '.join(text.split())
 
 
 class HTMLProcessor(abc.ABC):
@@ -37,7 +21,7 @@ class HTMLProcessor(abc.ABC):
         if len(content.strip()) != 0:
             self.content = bs4.BeautifulSoup(content, self.parser)
         else:
-            logging.debug(f'Create HTML Processor failed with content: {content}.')
+            logging.warning(f'Create HTML Processor failed with content: {content}.')
             raise ValueError('No valid content or url is given for HTML Processor.')
 
     def __repr__(self):
@@ -52,7 +36,8 @@ class ManManBuySearchResultProcessor(HTMLProcessor):
     def get_goods(self, limit: int | None = None) -> Generator[Good]:
         goods = self.content.find_all('div', limit=limit, class_=re.compile(r'DiscountItem.*itemContent'))
         for good in goods:
-            name = get_text(good.find('div', class_=re.compile(r'DiscountItem.*itemTitle')))
+            name = remove_unwanted_char(
+                good.find('div', class_=re.compile(r'DiscountItem.*itemTitle')).a.attrs['title'])
             price = format_price(get_text(good.find('div', class_=re.compile(r'DiscountItem.*itemSubTitle'))))
             date = format_date(get_text(good.find('span', class_=re.compile(r'DiscountItem.*itemTime'))))
             platform = get_text(good.find('span', class_=re.compile(r'DiscountItem.*itemMall')))
