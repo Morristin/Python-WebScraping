@@ -2,7 +2,7 @@ import logging
 
 import ollama
 
-from settings import settings
+from settings.settings import settings
 
 logging.getLogger(__name__)
 
@@ -29,30 +29,32 @@ class Ollama:
         so outer module can handle exception more easily.
         """
 
-    def __init__(self, model: str = settings.ai_integrate.ollama_model):
-        if model is None:
+    def __init__(self, model: str = None):
+        self.model = model if model is not None else settings.ai_integrate.ollama_model
+        if self.model is None:
             raise self.OllamaNotEnabledError()
+
+        try:
+            self._client.chat(model=self.model)
+        except ollama.ResponseError as err:
+            if err.status_code == 404:
+                logging.error(f'Cannot use {self.model} via ollama as the model does not exist.')
+            else:
+                logging.warning(f'Cannot use {self.model} via ollama. Error message: {err.error}')
+            raise self.OllamaError from err
         else:
-            self.model = model
+            logging.debug(f'Successfully initialize the ollama model.')
 
-            try:
-                self._client.chat(model=self.model)
-            except ollama.ResponseError as err:
-                if err.status_code == 404:
-                    logging.error(f'Cannot use {self.model} via ollama as the model does not exist.')
-                else:
-                    logging.warning(f'Cannot use {self.model} via ollama. Error message: {err.error}')
-                raise self.OllamaError from err
-
-    def chat(self, content: str, role: str = 'user') -> str:
+    def chat(self, content: str, enable_thinking: bool = False) -> str:
         """
         Create chat via ollama and return the pure content ollama model responses.
 
         If the content given is not blank but cannot detect response,
         function will raise `Ollama.OllamaError` for exception handling.
         """
-        response = self._client.chat(model=self.model, messages=[{'role': role, 'content': content}])
-        logging.debug(f'Get chat response from ollama: {response}')
+        response = self._client.chat(model=self.model, messages=[{'role': 'user', 'content': content}],
+                                     think=enable_thinking)
+        logging.info(f'Get chat response from ollama: {response}')
         if response.message.content is None:
             if len(content.strip()) != 0:
                 raise self.OllamaError(f'Cannot detect response\'s content from ollama ChatResponse: {response}')

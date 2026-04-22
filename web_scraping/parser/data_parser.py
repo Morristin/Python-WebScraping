@@ -4,6 +4,9 @@ import re
 
 import bs4
 
+from ai_integrate.ollama_integrate import Ollama
+from settings.settings import settings
+
 logging.getLogger(__name__)
 
 
@@ -20,12 +23,22 @@ def get_text(tag: bs4.element.Tag | None) -> str:
         raise ValueError(f'Can not get information from: {tag}')
 
 
-def get_title(tag) -> str:
+def get_title(tag, use_ai: bool = True) -> str:
     try:
-        return remove_unwanted_char(tag.a.attrs['title'])
+        title = remove_unwanted_char(tag.a.attrs['title'])
     except AttributeError:
         logging.warning(f'Can not perform get_title() on: {tag}')
         raise ValueError(f'Can not get information from: {tag}')
+
+    if use_ai:
+        try:
+            ollama = Ollama()  # TODO: 在集成更多AI模型后可能需要更改此段代码。
+        except Ollama.OllamaNotEnabledError:
+            pass  # Fallback to normal process.
+        else:
+            return ollama.chat(settings.get_text_prompt.format(tag.get_text()))
+
+    return title
 
 
 def get_link(tag) -> str:
@@ -48,10 +61,10 @@ def format_price(price: str) -> int | float:
     Convert price presented in multiple ways to a single integer or float.
     """
     if re.compile(r'需.*(?:会员|VIP)').search(price) is not None:
-        logging.debug(f'Data is not stored as the price is invalid: {price}')
+        logging.info(f'Data is not stored as the price is invalid: {price}')
         raise InvalidDataError('The price is for member only.')
     if re.compile(r'需.*凑单').search(price) is not None:
-        logging.debug(f'Data is not stored as the price is useless: {price}')
+        logging.info(f'Data is not stored as the price is useless: {price}')
         raise InvalidDataError('The price is for large-scale trade only.')
 
     for match in (re.compile(r'(\d+(\.\d+)?)元/件').search(price),
@@ -67,7 +80,7 @@ def format_price(price: str) -> int | float:
     if match is not None:
         return float(match.group(1))
     else:
-        logging.debug(f'Data is not stored as the price can not be recognized: {price}')
+        logging.warning(f'Data is not stored as the price can not be recognized: {price}')
         raise InvalidDataError('The price does not match any case predefined')
 
 

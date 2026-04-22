@@ -4,7 +4,7 @@ import logging
 from pathlib import Path
 
 from database.data_manager import GoodManager
-from settings import settings
+from settings.settings import settings
 from web_scraping.parser.html_parser import ManManBuySearchResultParser
 from web_scraping.webdriver.webdriver import FirefoxWebDriver, SafariWebDriver
 

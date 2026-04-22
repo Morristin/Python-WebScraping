@@ -34,14 +34,16 @@ def parse_args(args: argparse.Namespace):
         logging.info(f'Get good name from args: {search}')
 
     settings.set('ollama_model', args.ai_parser)
-
     return args
 
 
 if __name__ == '__main__':
-    logging.basicConfig(filename=Path(f'log/{dt.date.today()}.log'),
-                        format="%(asctime)s : %(levelname)-7s : %(name)s : %(message)s",
-                        level=logging.INFO)
+    log_format = "%(asctime)s : %(levelname)-7s : %(name)-7s : %(message)s"
+    if settings.debug:
+        logging.basicConfig(format=log_format, level=logging.INFO)
+        logging.warning(f'Debug mode is active.')
+    else:
+        logging.basicConfig(filename=Path(f'log/{dt.date.today()}.log'), format=log_format, level=logging.INFO)
 
     program_args = parse_args(parser.parse_args())
     spider = ManManBuySpider()

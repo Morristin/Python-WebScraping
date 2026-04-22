@@ -1,4 +1,5 @@
 {
+  "debug": false,
   "ai_integrate": {
     "ollama_model": null
   },

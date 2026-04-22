@@ -6,7 +6,7 @@ from sys import platform
 from selenium import webdriver
 from selenium.common.exceptions import SessionNotCreatedException
 
-from settings import settings
+from settings.settings import settings
 
 logging.getLogger(__name__)
 
