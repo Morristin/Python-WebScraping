@@ -13,6 +13,8 @@ parser.add_argument('-S', '--search', action='store', default=None,
                     metavar='Good Name', help='Specific the name of the good')
 parser.add_argument('--limit', action='store', default=1, type=int,
                     metavar='n', help='Limit the number of pages read from search result')
+parser.add_argument('--ai-parser', action='store', default=None, metavar='Model-size(:cloud)',
+                    help='The name of AI model you want to use for parser data (must match your ollama model)')
 parser.add_argument('--version', action='version', version='WebScraping Preview Version',
                     help='Print the version of the program')
 
@@ -30,6 +32,8 @@ def parse_args(args: argparse.Namespace):
             logging.info(f'Get good name from user input: {search}')
     else:
         logging.info(f'Get good name from args: {search}')
+
+    settings.set('ollama_model', args.ai_parser)
 
     return args
 

@@ -1,17 +1,17 @@
 import abc
 from typing import Generator, NamedTuple
 
-from web_scraping.processor.data_processor import *
+from web_scraping.parser.data_parser import *
 
 logging.getLogger(__name__)
 
 
-class HTMLProcessor(abc.ABC):
+class HTMLParser(abc.ABC):
     """
     An HTML Processor which process given HTML file and extract information of goods.
     **The information it extracts is stored in corresponding type** for further access.
 
-    Each subclass of processor is customized to serve specific website.
+    Each subclass of parser is customized to serve specific website.
     """
     parser = 'lxml'
 
@@ -28,7 +28,7 @@ class HTMLProcessor(abc.ABC):
         return f'<{self.__class__.__name__} on {self.url}>'
 
 
-class ManManBuySearchResultProcessor(HTMLProcessor):
+class ManManBuySearchResultParser(HTMLParser):
     """ An HTML Processor made for 慢慢买 search result. """
 
     Good = NamedTuple('Good',
@@ -37,8 +37,7 @@ class ManManBuySearchResultProcessor(HTMLProcessor):
     def get_goods(self, limit: int | None = None) -> Generator[Good]:
         goods = self.content.find_all('div', limit=limit, class_=re.compile(r'DiscountItem.*itemContent'))
         for good in goods:
-            name = remove_unwanted_char(
-                good.find('div', class_=re.compile(r'DiscountItem.*itemTitle')).a.attrs['title'])
+            name = get_title(good.find('div', class_=re.compile(r'DiscountItem.*itemTitle')))
 
             try:
                 price = format_price(get_text(good.find('div', class_=re.compile(r'DiscountItem.*itemSubTitle'))))

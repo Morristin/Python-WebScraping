@@ -1,0 +1,9 @@
+{
+  "ai_integrate": {
+    "ollama_model": null
+  },
+  "webdriver": {
+    "type": "Firefox",
+    "implicitly_wait": 5
+  }
+}

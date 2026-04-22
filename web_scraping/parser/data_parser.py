@@ -20,7 +20,15 @@ def get_text(tag: bs4.element.Tag | None) -> str:
         raise ValueError(f'Can not get information from: {tag}')
 
 
-def get_link(tag: bs4.element.Tag | None) -> str:
+def get_title(tag) -> str:
+    try:
+        return remove_unwanted_char(tag.a.attrs['title'])
+    except AttributeError:
+        logging.warning(f'Can not perform get_title() on: {tag}')
+        raise ValueError(f'Can not get information from: {tag}')
+
+
+def get_link(tag) -> str:
     """ Get link from argument and handle exceptions. """
     try:
         return tag.a.attrs['href']

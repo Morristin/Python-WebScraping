@@ -4,8 +4,9 @@ import logging
 from pathlib import Path
 
 from database.data_manager import GoodManager
-from web_scraping.processor.html_processor import ManManBuySearchResultProcessor
-from web_scraping.webdriver.webdriver import FirefoxWebDriver
+from settings import settings
+from web_scraping.parser.html_parser import ManManBuySearchResultParser
+from web_scraping.webdriver.webdriver import FirefoxWebDriver, SafariWebDriver
 
 logging.getLogger(__name__)
 
@@ -22,7 +23,11 @@ class Spider(abc.ABC):
         if self._website_url is None or self._search_url is None:
             raise AttributeError('Attribute "website_url" and "search_url" must be defined first in class.')
 
-        self.webdriver = FirefoxWebDriver()  # TODO: 根据外部设置文件决定所使用的 Web Driver.
+        match settings.webdriver.type:
+            case "Firefox":
+                self.webdriver = FirefoxWebDriver()
+            case "Safari":
+                self.webdriver = SafariWebDriver()
         self.data_manager = GoodManager()
 
     def quit(self):
@@ -77,7 +82,7 @@ class ManManBuySpider(Spider):
     def search(self, keyword: str, page_limit: int = 1):
         for page in range(1, page_limit + 1):
             url = self._search_url.format(keyword, page)
-            processor = ManManBuySearchResultProcessor(self.get(url), url)
+            processor = ManManBuySearchResultParser(self.get(url), url)
             for good in processor.get_goods():
                 self.data_manager.add_good(
                     GoodManager.Good(name=good.name, price=good.price, date=good.date, platform=good.platform,

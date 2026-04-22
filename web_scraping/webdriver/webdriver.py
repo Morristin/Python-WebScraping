@@ -6,6 +6,8 @@ from sys import platform
 from selenium import webdriver
 from selenium.common.exceptions import SessionNotCreatedException
 
+from settings import settings
+
 logging.getLogger(__name__)
 
 
@@ -45,13 +47,12 @@ class WebDriver(abc.ABC):
 
     @abc.abstractmethod
     def __init__(self):
-        # TODO: 从本地文件当中读取全局设置
-        self._implicitly_wait = 5
-
-        # These arguments are set to None, standing for that
-        # they are required to initialize by each subclass's implement.
+        # These arguments are required to initialize by each subclass's implement.
         self.service = None
         self.driver = None
+
+        if self.driver is not None:
+            self.driver.implicitly_wait(settings.webdriver.implicitly_wait)
 
     def quit(self):
         self.driver.quit()
