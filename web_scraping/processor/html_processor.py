@@ -31,14 +31,21 @@ class HTMLProcessor(abc.ABC):
 class ManManBuySearchResultProcessor(HTMLProcessor):
     """ An HTML Processor made for 慢慢买 search result. """
 
-    Good = NamedTuple('Good', [('name', str), ('price', int | float), ('date', dt.datetime), ('platform', str)])
+    Good = NamedTuple('Good',
+                      [('name', str), ('price', int | float), ('date', dt.datetime), ('platform', str), ('link', str)])
 
     def get_goods(self, limit: int | None = None) -> Generator[Good]:
         goods = self.content.find_all('div', limit=limit, class_=re.compile(r'DiscountItem.*itemContent'))
         for good in goods:
             name = remove_unwanted_char(
                 good.find('div', class_=re.compile(r'DiscountItem.*itemTitle')).a.attrs['title'])
-            price = format_price(get_text(good.find('div', class_=re.compile(r'DiscountItem.*itemSubTitle'))))
+
+            try:
+                price = format_price(get_text(good.find('div', class_=re.compile(r'DiscountItem.*itemSubTitle'))))
+            except InvalidDataError:
+                continue
+
             date = format_date(get_text(good.find('span', class_=re.compile(r'DiscountItem.*itemTime'))))
             platform = get_text(good.find('span', class_=re.compile(r'DiscountItem.*itemMall')))
-            yield self.Good(name=name, price=price, date=date, platform=platform)
+            link = get_link(good.find('div', class_=re.compile(r'DiscountItem.*itemTitle')))
+            yield self.Good(name=name, price=price, date=date, platform=platform, link=link)

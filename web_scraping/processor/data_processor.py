@@ -7,14 +7,26 @@ import bs4
 logging.getLogger(__name__)
 
 
+class InvalidDataError(Exception):
+    """ The data is marked as invalid because it's valueless for suggestion. """
+
+
 def get_text(tag: bs4.element.Tag | None) -> str:
-    """ Apply get_text() method on argument, and format text for further operations. """
+    """ Apply get_text() method on argument and handle exceptions. """
     if tag is not None:
-        text = tag.get_text()
+        return tag.get_text()
     else:
-        logging.warning('Can not perform get_text() on: {tag}')
-        raise ValueError('Can not get information from: {tag}')
-    return text
+        logging.warning(f'Can not perform get_text() on: {tag}')
+        raise ValueError(f'Can not get information from: {tag}')
+
+
+def get_link(tag: bs4.element.Tag | None) -> str:
+    """ Get link from argument and handle exceptions. """
+    try:
+        return tag.a.attrs['href']
+    except AttributeError:
+        logging.warning(f'Can not perform get_link() on: {tag}')
+        raise ValueError(f'Can not get information from: {tag}')
 
 
 def remove_unwanted_char(text: str, unwanted_char=('\n', '，', '。', '、')):
@@ -27,11 +39,28 @@ def format_price(price: str) -> int | float:
     """
     Convert price presented in multiple ways to a single integer or float.
     """
-    # TODO: 此函数目前处于占位符状态。需要进一步实现其正常功能。
-    try:
-        return float(re.findall(r'(\d+\.?\d*)元', price)[0])
-    except IndexError:
-        return float(re.findall(r'\d+', price)[0])
+    if re.compile(r'需.*(?:会员|VIP)').search(price) is not None:
+        logging.debug(f'Data is not stored as the price is invalid: {price}')
+        raise InvalidDataError('The price is for member only.')
+    if re.compile(r'需.*凑单').search(price) is not None:
+        logging.debug(f'Data is not stored as the price is useless: {price}')
+        raise InvalidDataError('The price is for large-scale trade only.')
+
+    for match in (re.compile(r'(\d+(\.\d+)?)元/件').search(price),
+                  # 包含格式 "XX元拍X件(合XX元/件)" 与 "买A送A，XX元/件（共XX元）" 与 "XX元/件（共XX元）"
+                  re.compile(r'(\d+(\.\d+)?)元.*实付\d+(\.\d+)?元').search(price),  # 包含格式 "XX元（买A送A实付XX元）赠送主商品"
+                  re.compile(r'(\d+(\.\d+)?)元.*\d+(\.\d+)?淘?金币').search(price),  # 包含格式 "XX元+XX金币" 与 "XX元+XX淘金币"
+                  ):
+        if match is not None:
+            break
+    else:
+        match = re.compile(r'(\d+(\.\d+)?)元').search(price)
+
+    if match is not None:
+        return float(match.group(1))
+    else:
+        logging.debug(f'Data is not stored as the price can not be recognized: {price}')
+        raise InvalidDataError('The price does not match any case predefined')
 
 
 def format_date(date: str) -> dt.datetime:

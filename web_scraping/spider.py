@@ -80,4 +80,5 @@ class ManManBuySpider(Spider):
             processor = ManManBuySearchResultProcessor(self.get(url), url)
             for good in processor.get_goods():
                 self.data_manager.add_good(
-                    GoodManager.Good(name=good.name, price=good.price, date=good.date, platform=good.platform))
+                    GoodManager.Good(name=good.name, price=good.price, date=good.date, platform=good.platform,
+                                     link=good.link))
