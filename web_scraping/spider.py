@@ -1,6 +1,7 @@
 import abc
 import hashlib
 import logging
+import os
 from pathlib import Path
 
 from database.data_manager import GoodManager
@@ -41,7 +42,10 @@ class Spider(abc.ABC):
 
     @staticmethod
     def cache_file(url: str) -> Path:
-        return Path('.cache') / Path(hashlib.md5(url.encode()).hexdigest()[:12] + '.html')
+        cache_path = Path('cache') / Path(hashlib.md5(url.encode()).hexdigest()[:12] + '.html')
+        if not cache_path.parent.exists():
+            os.mkdir(cache_path.parent)
+        return cache_path
 
     def get(self, url: str, use_cache: bool = True) -> str:
         """

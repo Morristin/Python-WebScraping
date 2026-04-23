@@ -19,7 +19,10 @@ class HTMLParser(abc.ABC):
         self.url = url
 
         if len(content.strip()) != 0:
-            self.content = bs4.BeautifulSoup(content, self.parser)
+            try:
+                self.content = bs4.BeautifulSoup(content, self.parser)
+            except bs4.exceptions.FeatureNotFound:
+                self.content = bs4.BeautifulSoup(content, 'html.parser')
         else:
             logging.warning(f'Create HTML Processor failed with content: {content}.')
             raise ValueError('No valid content or url is given for HTML Processor.')

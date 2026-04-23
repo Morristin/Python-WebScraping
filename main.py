@@ -5,9 +5,8 @@ from web_scraping.spider import *
 
 logging.getLogger(__name__)
 
-parser = argparse.ArgumentParser(
-    prog='main.py',
-    description='Search the price of the good given and store to database.')
+parser = argparse.ArgumentParser(prog='main.py',
+                                 description='Search the price of the good given and store to database.')
 
 parser.add_argument('-S', '--search', action='store', default=None,
                     metavar='Good Name', help='Specific the name of the good')
@@ -43,7 +42,11 @@ if __name__ == '__main__':
         logging.basicConfig(format=log_format, level=logging.INFO)
         logging.warning(f'Debug mode is active.')
     else:
-        logging.basicConfig(filename=Path(f'log/{dt.date.today()}.log'), format=log_format, level=logging.INFO)
+        log_path = Path(f'log/{dt.date.today()}.log')
+        if not log_path.parent.exists():
+            os.mkdir(log_path.parent)
+            log_path.touch()
+        logging.basicConfig(filename=log_path, format=log_format, level=logging.INFO)
 
     program_args = parse_args(parser.parse_args())
     spider = ManManBuySpider()
