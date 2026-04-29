@@ -1,5 +1,4 @@
 import argparse
-import datetime as dt
 
 from web_scraping.spider import *
 
@@ -12,6 +11,8 @@ parser.add_argument('-S', '--search', action='store', default=None,
                     metavar='Good Name', help='Specific the name of the good')
 parser.add_argument('--limit', action='store', default=1, type=int,
                     metavar='n', help='Limit the number of pages read from search result')
+parser.add_argument('--history', '--get-history-data', action='store_true', default=False,
+                    help='Collect each good\'s history prices for every good in search result.')
 parser.add_argument('--ai-parser', action='store', default=None, metavar='Model-size(:cloud)',
                     help='The name of AI model you want to use for parser data (must match your ollama model)')
 parser.add_argument('--version', action='version', version='WebScraping Preview Version',
@@ -50,6 +51,6 @@ if __name__ == '__main__':
 
     program_args = parse_args(parser.parse_args())
     spider = ManManBuySpider()
-    spider.search(program_args.search, program_args.limit)
+    spider.search(program_args.search, program_args.limit, program_args.history)
     print(f'Successfully search good {program_args.search} and store its prices to database.')
     spider.quit()

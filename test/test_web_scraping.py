@@ -21,4 +21,4 @@ class WebDriverCreateTestCase(unittest.TestCase):
 class WebDriverToolTestCase(unittest.TestCase):
     def testManManBuyHistoryData(self):
         spider = ManManBuySpider()
-        spider.get_history_data('https://cu.manmanbuy.com/discuxiao_552871634.aspx')
+        spider.get_history_data('test_good', 'https://cu.manmanbuy.com/discuxiao_552871634.aspx')

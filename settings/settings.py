@@ -50,7 +50,7 @@ class Settings:
             filename = func.__name__ + '.txt' if filename is None else filename
 
             @wraps(func)
-            def _(*args, **kwargs):
+            def _():
                 return (Path(__file__).parent / Path(filename)).read_text()
 
             external_setting[func.__name__] = _
