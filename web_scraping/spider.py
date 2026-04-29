@@ -8,6 +8,7 @@ from database.data_manager import GoodManager
 from settings.settings import settings
 from web_scraping.parser.html_parser import ManManBuySearchResultParser
 from web_scraping.webdriver.webdriver import FirefoxWebDriver, SafariWebDriver
+from web_scraping.webdriver.webdriver_tool import WebDriverTool
 
 logging.getLogger(__name__)
 
@@ -29,6 +30,8 @@ class Spider(abc.ABC):
                 self.webdriver = FirefoxWebDriver()
             case "Safari":
                 self.webdriver = SafariWebDriver()
+        self.webdriver_tool = WebDriverTool(self.webdriver)
+
         self.data_manager = GoodManager()
 
     def quit(self):
@@ -82,6 +85,7 @@ class Spider(abc.ABC):
 class ManManBuySpider(Spider):
     _website_url = 'https://www.manmanbuy.com/'
     _search_url = 'https://s.manmanbuy.com/pc/search/result?keyword={}&pageId={}'
+    _cookies_path = Path('web_scraping/webdriver/manmanbuy_cookies.json')
 
     def search(self, keyword: str, page_limit: int = 1):
         for page in range(1, page_limit + 1):
@@ -91,3 +95,20 @@ class ManManBuySpider(Spider):
                 self.data_manager.add_good(
                     GoodManager.Good(name=good.name, price=good.price, date=good.date, platform=good.platform,
                                      link=good.link))
+
+    def get_history_data(self, good_url: str = None, load_cookies: bool = True) -> list[list]:
+        if load_cookies:
+            try:
+                self.webdriver.load_cookies(filepath=self._cookies_path, website=self._website_url)
+            except FileNotFoundError:
+                self.webdriver.get(self._website_url)
+                # TODO: 将登录脚本转化为完全自动运行。
+                # Wait until user login, then store cookies.
+                self.webdriver_tool.manmanbuy_login()
+                input('No valid cookies. Please manually log in.\n'
+                      'After log in, press the enter to continue.')
+                self.webdriver.store_cookies(filepath=self._cookies_path)
+
+        if good_url is not None:
+            self.get(good_url, use_cache=False)
+        return self.webdriver_tool.get_manmanbuy_history_data()

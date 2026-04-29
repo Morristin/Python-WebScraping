@@ -1,6 +1,9 @@
 import abc
+import json
 import logging
 import subprocess
+from os.path import exists
+from pathlib import Path
 from sys import platform
 
 from selenium import webdriver
@@ -47,15 +50,54 @@ class WebDriver(abc.ABC):
 
     @abc.abstractmethod
     def __init__(self):
-        # These arguments are required to initialize by each subclass's implement.
-        self.service = None
-        self.driver = None
+        """
+        **This method should be overwritten and should not be called by subclass**.
 
-        if self.driver is not None:
-            self.driver.implicitly_wait(settings.webdriver.implicitly_wait)
+        Because here use Firefox to activate attribute hint of IDE,
+        if super().__init__() is called by subclass, a geckodriver without manager will be created.
+        """
+        self.service = webdriver.FirefoxService()
+        self.driver = webdriver.Firefox()
 
     def quit(self):
         self.driver.quit()
+
+    def load_cookies(self, filepath: str | Path, website: str = None):
+        """
+        Load a cookies file in JSON format for webdriver.
+
+        Attention, **either webdriver have a tab which matches cookies,
+        or a website matches cookies is given**. Else browser will raise errors.
+        """
+        file = Path(filepath) if not isinstance(filepath, Path) else filepath
+        if not exists(file):
+            logging.warning(f'Can not get cookies from cookies file: {file}')
+            raise FileNotFoundError(f'Can not find cookies file: {file}')
+        else:
+            with open(file, 'r') as cookies_file:
+                cookies = json.load(cookies_file)
+
+        if website is not None:
+            self.get(website)
+        for cookie in cookies:
+            if cookie["sameSite"] == "None":
+                # 'secure' must be true if 'sameSite' is None
+                # else the browser will refuse to load this cookie.
+                cookie["secure"] = True
+            self.driver.add_cookie(cookie)
+
+        self.driver.refresh()
+
+    def store_cookies(self, filepath: str | Path):
+        """ Store current cookies of webdriver to a JSON file. """
+        cookies = self.driver.get_cookies()
+
+        if not isinstance(filepath, Path):
+            filepath = Path(filepath)
+        if not exists(filepath) and isinstance(filepath, Path):
+            filepath.touch()
+        with open(filepath, 'w') as cookies_file:
+            json.dump(cookies, cookies_file)
 
     def get(self, url: str) -> str:
         self.driver.get(url)
@@ -71,12 +113,13 @@ class FirefoxWebDriver(WebDriver):
     """
 
     def __init__(self):
-        super().__init__()
-
         self.service = webdriver.FirefoxService(executable_path=self.find_webdriver_path('geckodriver'))
         logging.debug('Successfully create firefox service.')
         self.driver = webdriver.Firefox(service=self.service)
         logging.info('Successfully create firefox web driver.')
+
+        if self.driver is not None:
+            self.driver.implicitly_wait(settings.webdriver.implicitly_wait)
 
 
 class SafariWebDriver(WebDriver):
@@ -107,3 +150,6 @@ class SafariWebDriver(WebDriver):
             exit()  # TODO: 可能需要更多的处理保证所有数据处于合法状态。
         else:
             logging.info('Successfully create safari web driver.')
+
+        if self.driver is not None:
+            self.driver.implicitly_wait(settings.webdriver.implicitly_wait)
