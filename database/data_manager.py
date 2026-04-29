@@ -43,3 +43,5 @@ class GoodManager:
             # Goods.ID doesn't match UNIQUE requirement.
             # Which means the same data is stored twice, just ignore it.
             pass
+
+data_manager = GoodManager()

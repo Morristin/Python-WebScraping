@@ -1,118 +1,150 @@
-import abc
-import datetime as dt
-import hashlib
+import json
 import logging
 import os
 from pathlib import Path
 
-from database.data_manager import GoodManager
-from settings.settings import settings
-from web_scraping.parser.html_parser import ManManBuySearchResultParser
-from web_scraping.webdriver.webdriver import FirefoxWebDriver, SafariWebDriver
-from web_scraping.webdriver.webdriver_tool import WebDriverTool
+from selenium import webdriver
 
 logging.getLogger(__name__)
 
 
-class Spider(abc.ABC):
+def find_webdriver_path(webdriver_name: str) -> str | None:
     """
-    A general web_scraping model for collecting and analyzing digital trade data.
-    """
-    _website_url = None
-    _search_url = None
+    Try to find where the local web driver is. **Only work with macOS and Linux**.
 
+    If no local web driver found or system doesn't match requirement,
+    return `None` to let selenium automatically download web driver.
+    """
+    from sys import platform
+    import subprocess
+
+    if platform in ('darwin', 'linux'):
+        try:
+            result = subprocess.run(['which', webdriver_name], capture_output=True, timeout=1, check=True)
+        except TimeoutError:
+            logging.warning(f'Time out when search local web driver path: "which {webdriver_name}" time out.')
+        except subprocess.CalledProcessError:
+            logging.warning(f'Failed to find the local web driver: {webdriver_name}')
+        else:
+            if result.stdout is not None:
+                path = result.stdout.decode().strip().split('\n')[0]
+                logging.info(f'Successfully find the path of local {webdriver_name} web driver: {path}')
+                return path
+            else:
+                logging.warning(f'Local web driver may not exist: {webdriver_name}')
+    else:
+        logging.warning(f'Current platform does not support automatically find web driver: {platform}')
+
+    return None
+
+
+def get_safari_driver() -> webdriver.Safari:
+    class PlatformError(Exception):
+        """ Try to create safari web driver on a platform which is not macOS. """
+
+    from sys import platform
+    if platform != 'darwin':
+        logging.error('Try to create Safari web driver on a platform which is not macOS.')
+        raise PlatformError(PlatformError.__doc__)
+
+    service = webdriver.SafariService(executable_path=find_webdriver_path('safaridriver'))
+    logging.debug('Successfully create safari service.')
+
+    from selenium.common import SessionNotCreatedException
+    try:
+        driver = webdriver.Safari(service=service)
+    except SessionNotCreatedException:
+        print('Please execute command "safaridriver --enable" first,\n'
+              'or manually toggle "Allow Remote Automation" in developer section of setting on.')
+        logging.error('Failed to create safari web driver, as safari driver is not enabled yet.')
+        exit()  # TODO: 可能需要更多的处理保证所有数据处于合法状态。
+    else:
+        logging.info('Successfully create safari web driver.')
+        return driver
+
+
+class Spider:
     def __init__(self):
-        # Check if subclass has its own valid 'website_url' and 'search_url'
-        if self._website_url is None or self._search_url is None:
-            raise AttributeError('Attribute "website_url" and "search_url" must be defined first in class.')
+        from settings.settings import settings
 
         match settings.webdriver.type:
             case "Firefox":
-                self.webdriver = FirefoxWebDriver()
+                service = webdriver.FirefoxService(executable_path=find_webdriver_path('geckodriver'))
+                logging.debug('Successfully create firefox service.')
+                self.webdriver = webdriver.Firefox(service=service)
+                logging.info('Successfully create firefox web driver.')
             case "Safari":
-                self.webdriver = SafariWebDriver()
-        self.webdriver_tool = WebDriverTool(self.webdriver)
-
-        self.data_manager = GoodManager()
-
-    def quit(self):
-        self.webdriver.quit()
+                self.webdriver = get_safari_driver()
+        self.webdriver.implicitly_wait(settings.webdriver.implicitly_wait)
 
     def __repr__(self):
-        return f'<{self.__class__.__name__} work on {self._website_url}>'
+        return f'<Spider work on {self.webdriver.__class__.__name__}>'
 
-    def __str__(self):
-        return self.__class__.__name__
+    def load_cookies(self, cookies_path: str | Path, website: str = None):
+        """
+        Load a cookies file in JSON format for webdriver.
 
-    @staticmethod
-    def cache_file(url: str) -> Path:
-        cache_path = Path('cache') / Path(hashlib.md5(url.encode()).hexdigest()[:12] + '.html')
-        if not cache_path.parent.exists():
-            os.mkdir(cache_path.parent)
-        return cache_path
+        Attention, **either webdriver have a tab which matches cookies,
+        or a website matches cookies is given**. Else browser will raise errors.
+        """
+        file = Path(cookies_path) if not isinstance(cookies_path, Path) else cookies_path
+        if not os.path.exists(file):
+            logging.warning(f'Can not get cookies from cookies file: {file}')
+            raise FileNotFoundError(f'Can not find cookies file: {file}')
+        else:
+            with open(file, 'r') as cookies_file:
+                cookies = json.load(cookies_file)
 
-    def get(self, url: str, use_cache: bool = True) -> str:
+        if website is not None:
+            self.get(website)
+        for cookie in cookies:
+            if cookie["sameSite"] == "None":
+                # 'secure' must be true if 'sameSite' is None
+                # else the browser will refuse to load this cookie.
+                cookie["secure"] = True
+            self.webdriver.add_cookie(cookie)
+
+        self.webdriver.refresh()
+
+    def store_cookies(self, cookies_path: str | Path):
+        """ Store current cookies of webdriver to a JSON file. """
+        cookies = self.webdriver.get_cookies()
+
+        if not isinstance(cookies_path, Path):
+            cookies_path = Path(cookies_path)
+        if not os.path.exists(cookies_path) and isinstance(cookies_path, Path):
+            cookies_path.touch()
+        with open(cookies_path, 'w') as cookies_file:
+            json.dump(cookies, cookies_file)
+
+    def get(self, url: str, use_cache: bool = False) -> str:
         """
         Connect to the given url, and return the string format of page source file.
 
         This function use cache mechanism to store recent websites' content.
         you can change the value of argument `use_cache` to control whether to use cache mechanism.
         """
-        cache_path = self.cache_file(url)
+        import hashlib
+        cache_path = Path('cache') / Path(hashlib.md5(url.encode()).hexdigest()[:12] + '.html')
 
-        if use_cache:
-            if cache_path.exists():
-                # Directly load page cache.
-                cache_file = open(cache_path, 'r')
-                page_source = cache_file.read()
-                logging.info(f'Load {url} page source from .cache: {cache_path}')
-            else:
-                # Get page and store as a cache.
-                page_source = self.webdriver.get(url)
-                cache_file = open(cache_path, 'x')
+        if use_cache and cache_path.exists():
+            # Directly load page cache.
+            cache_file = open(cache_path, 'r')
+            page_source = cache_file.read()
+            logging.info(f'Load {url} page source from .cache: {cache_path}')
+        else:
+            self.webdriver.get(url)
+            page_source = self.webdriver.page_source
+            logging.info(f'Successfully connected to {url}.')
+
+        if use_cache and not cache_path.exists():
+            if not cache_path.parent.exists():
+                os.mkdir(cache_path.parent)
+            with open(cache_path, 'x') as cache_file:
                 cache_file.write(page_source)
                 logging.info(f'Store {url} page source to file: {cache_path}')
-            cache_file.close()
 
-        else:
-            page_source = self.webdriver.get(url)
         return page_source
 
-    @abc.abstractmethod
-    def search(self, keyword: str):
-        pass
 
-
-class ManManBuySpider(Spider):
-    _website_url = 'https://www.manmanbuy.com/'
-    _search_url = 'https://s.manmanbuy.com/pc/search/result?keyword={}&pageId={}'
-    _cookies_path = Path('web_scraping/webdriver/manmanbuy_cookies.json')
-
-    def search(self, keyword: str, page_limit: int = 1, get_history_data: bool = False):
-        for page in range(1, page_limit + 1):
-            url = self._search_url.format(keyword, page)
-            processor = ManManBuySearchResultParser(self.get(url), url)
-            for good in processor.get_goods():
-                self.data_manager.add_good(good.name, good.price, good.date, good.platform, good.link)
-                if get_history_data:
-                    self.get_history_data(good.name, good.link, good_platform=good.platform)
-
-    def get_history_data(self, good_name: str, good_url: str, good_platform: str = None, load_cookies: bool = True):
-        if load_cookies:
-            try:
-                self.webdriver.load_cookies(filepath=self._cookies_path, website=self._website_url)
-            except FileNotFoundError:
-                self.webdriver.get(self._website_url)
-                # TODO: 将登录脚本转化为完全自动运行。
-                # Wait until user login, then store cookies.
-                self.webdriver_tool.manmanbuy_login()
-                input('No valid cookies. Please manually log in.\n'
-                      'After log in, press the enter to continue.')
-                self.webdriver.store_cookies(filepath=self._cookies_path)
-
-        self.get(good_url, use_cache=False)
-        history_data = self.webdriver_tool.get_manmanbuy_history_data()
-
-        for data in history_data:
-            date = dt.datetime.fromtimestamp(data[0] / 1000)
-            self.data_manager.add_good(name=good_name, price=data[1], date=date, platform=good_platform)
+spider = Spider()
