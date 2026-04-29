@@ -80,6 +80,13 @@ class Spider:
     def __repr__(self):
         return f'<Spider work on {self.webdriver.__class__.__name__}>'
 
+    def __enter__(self):
+        self.webdriver.minimize_window()
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.webdriver.quit()
+
     def load_cookies(self, cookies_path: str | Path, website: str = None):
         """
         Load a cookies file in JSON format for webdriver.
@@ -145,6 +152,3 @@ class Spider:
                 logging.info(f'Store {url} page source to file: {cache_path}')
 
         return page_source
-
-
-spider = Spider()

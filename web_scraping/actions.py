@@ -2,13 +2,13 @@ import logging
 from pathlib import Path
 
 from database.data_manager import data_manager
-from web_scraping.spider import spider
+from web_scraping.spider import Spider
 
 logging.getLogger(__name__)
 
 
 # noinspection PyUnresolvedReferences
-def search_on_manmanbuy(keyword: str, page: int = 1):
+def search_on_manmanbuy(spider: Spider, keyword: str, page: int = 1):
     search_url = 'https://s.manmanbuy.com/pc/search/result?keyword={}&pageId={}'
     search_result = spider.get(search_url.format(keyword, page), use_cache=True)
 
@@ -28,7 +28,7 @@ def search_on_manmanbuy(keyword: str, page: int = 1):
                 re.compile(r'需.*凑单').search(price) is not None):
             logging.info(f'Data is not stored as the price is invalid: {price}')
             continue
-        price = re.compile(r'(\d+(\.\d+)?)元').findall(price)[-1]
+        price = re.compile(r'(\d+(\.\d+)?)元').search(price).group(1)
 
         import datetime as dt
         date = good.find('span', class_=re.compile(r'DiscountItem.*itemTime')).get_text()
@@ -39,7 +39,7 @@ def search_on_manmanbuy(keyword: str, page: int = 1):
         data_manager.add_good(name, price, date, platform, link)
 
 
-def get_history_price_on_manmanbuy(good_name: str, good_url: str, good_platform: str = None, /,
+def get_history_price_on_manmanbuy(spider: Spider, good_name: str, good_url: str, good_platform: str = None, /,
                                    load_cookies: bool = True):
     """
     Get manmanbuy history data using webdriver.
@@ -54,25 +54,27 @@ def get_history_price_on_manmanbuy(good_name: str, good_url: str, good_platform:
         from selenium.webdriver.support.expected_conditions import visibility_of_element_located
         from selenium.webdriver.support.wait import WebDriverWait
 
-        wait = WebDriverWait(spider.driver, timeout=20, poll_frequency=0.5, ignored_exceptions=[NoSuchElementException])
+        wait = WebDriverWait(spider.webdriver, timeout=20, poll_frequency=0.5,
+                             ignored_exceptions=[NoSuchElementException])
         wait.until(visibility_of_element_located((By.XPATH, xpath)))
         if click:
             spider.webdriver.find_element(By.XPATH, xpath).click()
 
     website_url = 'https://www.manmanbuy.com/'
-    cookies_path = Path('web_scraping/manmanbuy_cookies.json')
+    cookies_path = Path('web_scraping/cookies/manmanbuy_cookies.json')
 
     if load_cookies:
         try:
-            spider.load_cookies(filepath=cookies_path, website=website_url)
+            spider.load_cookies(cookies_path=cookies_path, website=website_url)
         except FileNotFoundError:
             spider.get(website_url)
             wait_for_element("//a[@class='pt' and contains(text(), '登录')]", click=True)
             input('No valid cookies. Please manually log in, and press the enter to continue.')
-            spider.store_cookies(filepath=cookies_path)
+            spider.store_cookies(cookies_path=cookies_path)
 
     spider.get(good_url)
     wait_for_element("//img[contains(@src, 'trendChartImage')]", click=True)
+    spider.webdriver.switch_to.window(spider.webdriver.window_handles[-1])
     wait_for_element("//canvas")
     history_data = spider.webdriver.execute_script('''return flotChart.oldData''')
 
