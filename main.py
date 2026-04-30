@@ -1,8 +1,5 @@
 import argparse
-import datetime as dt
 import logging
-import os
-from pathlib import Path
 
 import bpython
 
@@ -21,11 +18,6 @@ parser = argparse.ArgumentParser(prog='WebScraping', description='A web scraping
 parser.add_argument('--debug', '--print-log', action='store_true', default=False)
 parser.add_argument('--version', action='version', version='WebScraping Preview Version')
 
-
-def main():
-    print(f'You are now on "interact" branch of repository. Please start program in debug mode.')
-
-
 if __name__ == '__main__':
     program_args = parser.parse_args()
 
@@ -36,9 +28,4 @@ if __name__ == '__main__':
         with Spider() as spider:
             bpython.embed(locals_=globals())
     else:
-        log_path = Path(f'log/{dt.date.today()}.log')
-        if not log_path.parent.exists():
-            os.mkdir(log_path.parent)
-            log_path.touch()
-        logging.basicConfig(filename=log_path, format=log_format, level=logging.INFO)
-        main()
+        print(f'You are now on "interact" branch of repository. Please start program in debug mode.')
