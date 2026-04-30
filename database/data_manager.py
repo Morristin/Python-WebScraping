@@ -29,7 +29,7 @@ class GoodManager:
         """
         good_id = hashlib.md5((name + str(date.timestamp())).encode()).hexdigest()
         command = 'INSERT INTO Goods (ID, Name, Price, Date, Platform, Link) VALUES (?, ?, ?, ?, ?, ?)'
-        data = (good_id, name, price, date.isoformat(), platform, link)
+        data = (good_id, name, price, date.isoformat(sep=' '), platform, link)
 
         try:
             self.database.execute(command, data)

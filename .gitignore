@@ -7,6 +7,7 @@ __pycache__/
 
 /cache/
 /log/
+/web_scraping/firefox_addons/
 
 /database/goods.sqlite
 

@@ -53,6 +53,16 @@ def _wait_for_element(spider: Spider, xpath: str, timeout: float = 20, poll_freq
         spider.webdriver.find_element(By.XPATH, xpath).click()
 
 
+def _load_cookies(spider: Spider, cookies_path: str | Path, website_url: str):
+    try:
+        spider.load_cookies(cookies_path=cookies_path, website=website_url)
+    except FileNotFoundError:
+        spider.get(website_url)
+        _wait_for_element(spider, "//a[@class='pt' and contains(text(), '登录')]", perform_click=True)
+        input('No valid cookies. Please manually log in, and press the enter to continue.')
+        spider.store_cookies(cookies_path=cookies_path)
+
+
 def get_history_price_on_manmanbuy(spider: Spider, good_name: str, good_url: str, good_platform: str = None, /,
                                    load_cookies: bool = True):
     """
@@ -66,13 +76,7 @@ def get_history_price_on_manmanbuy(spider: Spider, good_name: str, good_url: str
     cookies_path = Path('web_scraping/cookies/manmanbuy_cookies.json')
 
     if load_cookies:
-        try:
-            spider.load_cookies(cookies_path=cookies_path, website=website_url)
-        except FileNotFoundError:
-            spider.get(website_url)
-            _wait_for_element(spider, "//a[@class='pt' and contains(text(), '登录')]", perform_click=True)
-            input('No valid cookies. Please manually log in, and press the enter to continue.')
-            spider.store_cookies(cookies_path=cookies_path)
+        _load_cookies(spider, cookies_path, website_url)
 
     spider.get(good_url)
     _wait_for_element(spider, "//img[contains(@src, 'trendChartImage')]", perform_click=True)
@@ -86,6 +90,23 @@ def get_history_price_on_manmanbuy(spider: Spider, good_name: str, good_url: str
         data_manager.add_good(name=good_name, price=data[1], date=date, platform=good_platform)
 
 
+def get_history_price_on_manmanbuy_direct(spider: Spider, name: str, url: str, load_cookies: bool = False):
+    website_url = 'https://www.manmanbuy.com/'
+    cookies_path = Path('web_scraping/cookies/manmanbuy_cookies.json')
+
+    if load_cookies:
+        _load_cookies(spider, cookies_path, website_url)
+
+    spider.get(url)
+    _wait_for_element(spider, "//canvas")
+    history_data = spider.webdriver.execute_script('''return flotChart.oldData''')
+
+    import datetime as dt
+    for data in history_data:
+        date = dt.datetime.fromtimestamp(data[0] / 1000)
+        data_manager.add_good(name=name, price=data[1], date=date)
+
+
 def get_history_price_on_hisprice(spider: Spider, good_name: str, url: str, good_platform: str = None):
     spider.get(url)
 
@@ -93,6 +114,7 @@ def get_history_price_on_hisprice(spider: Spider, good_name: str, url: str, good
     try:
         _wait_for_element(spider, "//div[contains(@id, 'captcha')]", timeout=10, poll_frequency=0.5)
         logging.error(f'Please perform captcha to continue.')
+        spider.webdriver.maximize_window()
     except SeleniumTimeoutException:
         pass
 

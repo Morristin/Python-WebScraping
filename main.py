@@ -8,11 +8,12 @@ import bpython
 
 from web_scraping.actions import get_history_price_on_hisprice as get_his_history
 from web_scraping.actions import get_history_price_on_manmanbuy as get_mmb_history
+from web_scraping.actions import get_history_price_on_manmanbuy_direct as get_mmb_history_direct
 from web_scraping.actions import search_on_manmanbuy as search
 from web_scraping.spider import Spider
 
 # Check all functions are prepared in namespace.
-_NAMESPACE = (search, get_mmb_history, get_his_history)
+_NAMESPACE = (search, get_mmb_history, get_his_history, get_mmb_history_direct)
 
 logging.getLogger(__name__)
 
