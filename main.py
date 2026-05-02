@@ -1,47 +1,42 @@
 import argparse
+import datetime as dt
+import logging
+import os
+from pathlib import Path
 
-from web_scraping.spider import *
+import bpython
+
+from web_scraping.actions import get_history_price_on_hp as get_his_history
+from web_scraping.actions import get_history_price_on_mmb as get_mmb_history
+from web_scraping.actions import get_history_price_on_mmb_direct as get_mmb_history_direct
+from web_scraping.actions import search_on_mmb as search
+from web_scraping.spider import Spider
+
+# Check all functions are prepared in namespace.
+_NAMESPACE = (search, get_mmb_history, get_his_history, get_mmb_history_direct)
 
 logging.getLogger(__name__)
 
-parser = argparse.ArgumentParser(prog='main.py',
-                                 description='Search the price of the good given and store to database.')
+parser = argparse.ArgumentParser(prog='WebScraping', description='Get the history price of goods.')
 
 parser.add_argument('-S', '--search', action='store', default=None,
                     metavar='Good Name', help='Specific the name of the good')
 parser.add_argument('--limit', action='store', default=1, type=int,
-                    metavar='n', help='Limit the number of pages read from search result')
+                    metavar='n', help='Limit the number of goods in search result.')
 parser.add_argument('--history', '--get-history-data', action='store_true', default=False,
                     help='Collect each good\'s history prices for every good in search result.')
-parser.add_argument('--ai-parser', action='store', default=None, metavar='Model-size(:cloud)',
-                    help='The name of AI model you want to use for parser data (must match your ollama model)')
-parser.add_argument('--version', action='version', version='WebScraping Preview Version',
-                    help='Print the version of the program')
-
-
-def parse_args(args: argparse.Namespace):
-    search = args.search
-    if search is None:
-        search = input('Please enter the good you want to search: ')
-        if len(search.strip()) == 0:
-            print('You must enter a valid good name.')
-            logging.error(f'User enter an invalid good name. Program exit.')
-            exit()
-        else:
-            args.search = search
-            logging.info(f'Get good name from user input: {search}')
-    else:
-        logging.info(f'Get good name from args: {search}')
-
-    settings.set('ollama_model', args.ai_parser)
-    return args
-
+parser.add_argument('--debug', '--print-log', action='store_true', default=False)
+parser.add_argument('--version', action='version', version='WebScraping Preview Version')
 
 if __name__ == '__main__':
+    program_args = parser.parse_args()
+
     log_format = "%(asctime)s : %(levelname)-7s : %(name)-7s : %(message)s"
-    if settings.debug:
+    if program_args.debug:
         logging.basicConfig(format=log_format, level=logging.INFO)
-        logging.warning(f'Debug mode is active.')
+        logging.warning(f'Debug mode is active. Your search requirement may be ignored.')
+        with Spider() as spider:
+            bpython.embed(locals_=globals())
     else:
         log_path = Path(f'log/{dt.date.today()}.log')
         if not log_path.parent.exists():
@@ -49,8 +44,6 @@ if __name__ == '__main__':
             log_path.touch()
         logging.basicConfig(filename=log_path, format=log_format, level=logging.INFO)
 
-    program_args = parse_args(parser.parse_args())
-    spider = ManManBuySpider()
-    spider.search(program_args.search, program_args.limit, program_args.history)
-    print(f'Successfully search good {program_args.search} and store its prices to database.')
-    spider.quit()
+        with Spider() as spider:
+            search(spider, program_args.search, program_args.limit, program_args.history)
+            print(f'Successfully search good {program_args.search} and store its prices to database.')

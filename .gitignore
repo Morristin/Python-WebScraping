@@ -10,4 +10,4 @@ __pycache__/
 
 /database/goods.sqlite
 
-/web_scraping/webdriver/manmanbuy_cookies.json
+/web_scraping/cookies/

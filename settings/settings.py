@@ -1,6 +1,5 @@
 import json
 import logging
-from functools import wraps
 from pathlib import Path
 from typing import Sequence, MutableMapping
 
@@ -42,25 +41,6 @@ class Settings:
             return super().__getattribute__(item)
         except AttributeError:
             return self[item]  # Reuse the implement of `__getitem__`.
-
-    @staticmethod
-    def get_from_external_file(filename: str = None):
-        def decorator(func):
-            nonlocal filename
-            filename = func.__name__ + '.txt' if filename is None else filename
-
-            @wraps(func)
-            def _():
-                return (Path(__file__).parent / Path(filename)).read_text()
-
-            external_setting[func.__name__] = _
-            return _
-
-        return decorator
-
-    @get_from_external_file('get_text_prompt.txt')
-    def get_text_prompt(self) -> str:
-        pass
 
     @staticmethod
     def _set_deep_level_item(content, key, value) -> bool:
