@@ -24,16 +24,13 @@ def find_webdriver_path(webdriver_name: str) -> str | None:
         except TimeoutError:
             logging.warning(f'Time out when search local web driver path: "which {webdriver_name}" time out.')
         except subprocess.CalledProcessError:
-            logging.warning(f'Failed to find the local web driver: {webdriver_name}')
+            logging.warning(f'Failed to find the local web driver: {webdriver_name}. Start downloading...')
         else:
-            if result.stdout is not None:
-                path = result.stdout.decode().strip().split('\n')[0]
-                logging.info(f'Successfully find the path of local {webdriver_name} web driver: {path}')
-                return path
-            else:
-                logging.warning(f'Local web driver may not exist: {webdriver_name}')
+            path = result.stdout.decode().strip().split('\n')[0]
+            logging.info(f'Successfully find the path of local {webdriver_name} web driver: {path}')
+            return path
     else:
-        logging.warning(f'Current platform does not support automatically find web driver: {platform}')
+        logging.info(f'Current platform does not support automatically find web driver: {platform}')
 
     return None
 
@@ -77,6 +74,8 @@ class Spider:
                 self.webdriver = get_safari_driver()
         self.webdriver.implicitly_wait(settings.webdriver.implicitly_wait)
 
+        self.cookies_loaded = False
+
     def __repr__(self):
         return f'<Spider work on {self.webdriver.__class__.__name__}>'
 
@@ -96,11 +95,12 @@ class Spider:
         """
         file = Path(cookies_path) if not isinstance(cookies_path, Path) else cookies_path
         if not os.path.exists(file):
-            logging.warning(f'Can not get cookies from cookies file: {file}')
-            raise FileNotFoundError(f'Can not find cookies file: {file}')
+            logging.warning(f'Cookies file does not exist: {file}.')
+            raise FileNotFoundError(f'Can not find cookies file: {file}.')
         else:
             with open(file, 'r') as cookies_file:
                 cookies = json.load(cookies_file)
+            logging.info(f'Successfully loaded cookies file: {file}.')
 
         if website is not None:
             self.get(website)
@@ -111,6 +111,8 @@ class Spider:
                 cookie["secure"] = True
             self.webdriver.add_cookie(cookie)
 
+        self.cookies_loaded = True
+        logging.info(f'Finish loading cookies. Refreshing webdriver...')
         self.webdriver.refresh()
 
     def store_cookies(self, cookies_path: str | Path):
@@ -124,6 +126,7 @@ class Spider:
             cookies_path.touch()
         with open(cookies_path, 'w') as cookies_file:
             json.dump(cookies, cookies_file)
+        logging.info(f'Successfully stored cookies file: {cookies_path}.')
 
     def get(self, url: str, use_cache: bool = False) -> str:
         """
@@ -139,7 +142,7 @@ class Spider:
             # Directly load page cache.
             cache_file = open(cache_path, 'r')
             page_source = cache_file.read()
-            logging.info(f'Load {url} page source from .cache: {cache_path}')
+            logging.info(f'Loaded {url} page source from cache: {cache_path}')
         else:
             self.webdriver.get(url)
             page_source = self.webdriver.page_source
@@ -150,6 +153,6 @@ class Spider:
                 os.mkdir(cache_path.parent)
             with open(cache_path, 'x') as cache_file:
                 cache_file.write(page_source)
-                logging.info(f'Store {url} page source to file: {cache_path}')
+                logging.info(f'Stored {url} page source to cache: {cache_path}')
 
         return page_source

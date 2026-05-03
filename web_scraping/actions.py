@@ -7,25 +7,12 @@ from web_scraping.spider import Spider
 logging.getLogger(__name__)
 
 
-def _wait_for_element(spider: Spider, xpath: str, timeout: float = 20, poll_frequency: float = 0.5,
-                      perform_click: bool = False):
-    from selenium.common import NoSuchElementException
-    from selenium.webdriver.common.by import By
-    from selenium.webdriver.support.expected_conditions import visibility_of_element_located
-    from selenium.webdriver.support.wait import WebDriverWait
-
-    wait = WebDriverWait(spider.webdriver, timeout=timeout, poll_frequency=poll_frequency,
-                         ignored_exceptions=[NoSuchElementException])
-    wait.until(visibility_of_element_located((By.XPATH, xpath)))
-    if perform_click:
-        spider.webdriver.find_element(By.XPATH, xpath).click()
-
-
 def _load_cookies(spider: Spider, cookies_path: str | Path, website_url: str = None):
     try:
         spider.load_cookies(cookies_path=cookies_path, website=website_url)
     except FileNotFoundError:
         if website_url is None:
+            logging.error(f'Cannot perform sign in.')
             raise RuntimeError('Cannot perform sign in without website url.')
         spider.get(website_url)
         _wait_for_element(spider, "//a[@class='pt' and contains(text(), '登录')]", perform_click=True)
@@ -37,15 +24,43 @@ def _load_cookies(spider: Spider, cookies_path: str | Path, website_url: str = N
         spider.store_cookies(cookies_path=cookies_path)
 
 
+def require_mmb_cookies(func):
+    website_url = 'https://www.manmanbuy.com/'
+    cookies_path = Path('web_scraping/cookies/manmanbuy_cookies.json')
+
+    import functools
+    @functools.wraps(func)
+    def wrapper(spider: Spider, *args, **kwargs):
+        if not spider.cookies_loaded:
+            _load_cookies(spider, cookies_path, website_url)
+        func(spider, *args, **kwargs)
+
+    return wrapper
+
+
+def _wait_for_element(spider: Spider, xpath: str, timeout: float = 20, poll_frequency: float = 0.5,
+                      perform_click: bool = False):
+    from selenium.common import NoSuchElementException
+    from selenium.webdriver.common.by import By
+    from selenium.webdriver.support.expected_conditions import visibility_of_element_located
+    from selenium.webdriver.support.wait import WebDriverWait
+
+    wait = WebDriverWait(spider.webdriver, timeout=timeout, poll_frequency=poll_frequency,
+                         ignored_exceptions=[NoSuchElementException])
+    wait.until(visibility_of_element_located((By.XPATH, xpath)))
+    logging.debug(f'Element {xpath} found in {spider.webdriver.current_url}.')
+    if perform_click:
+        spider.webdriver.find_element(By.XPATH, xpath).click()
+        logging.debug(f'Perform click on element {xpath}.')
+
+
 # noinspection PyUnresolvedReferences
+@require_mmb_cookies
 def search_on_mmb(spider: Spider, keyword: str, goods_number: int = 1, get_history: bool = False, /,
                   start_page: int = 1):
     website_url = 'https://www.manmanbuy.com/'
     search_url = 'https://s.manmanbuy.com/pc/search/result?keyword={}&pageId={}'
     search_result = spider.get(search_url.format(keyword, start_page), use_cache=True)
-
-    if get_history:
-        _load_cookies(spider, Path('web_scraping/cookies/manmanbuy_cookies.json'), website_url)
 
     import bs4
     try:
@@ -74,7 +89,7 @@ def search_on_mmb(spider: Spider, keyword: str, goods_number: int = 1, get_histo
         data_manager.add_good(name, price, date, platform, link)
 
         if get_history:
-            get_history_price_on_mmb(spider, name, link, platform, load_cookies=False)
+            get_history_price_on_mmb(spider, name, link, platform)
 
         if goods_number > 0:
             goods_number -= 1
@@ -84,8 +99,8 @@ def search_on_mmb(spider: Spider, keyword: str, goods_number: int = 1, get_histo
         search_on_mmb(spider, keyword, goods_number, get_history, start_page=start_page + 1)
 
 
-def get_history_price_on_mmb(spider: Spider, good_name: str, good_url: str, good_platform: str = None, /,
-                             load_cookies: bool = True):
+@require_mmb_cookies
+def get_history_price_on_mmb(spider: Spider, good_name: str, good_url: str, good_platform: str = None):
     """
     Get ManManBuy history data using webdriver.
 
@@ -93,17 +108,12 @@ def get_history_price_on_mmb(spider: Spider, good_name: str, good_url: str, good
     and this function require valid cookie of ManManBuy or manually log in.
     """
 
-    website_url = 'https://www.manmanbuy.com/'
-    cookies_path = Path('web_scraping/cookies/manmanbuy_cookies.json')
-
-    if load_cookies:
-        _load_cookies(spider, cookies_path, website_url)
-
     spider.get(good_url)
     _wait_for_element(spider, "//img[contains(@src, 'trendChartImage')]", perform_click=True)
     spider.webdriver.switch_to.window(spider.webdriver.window_handles[-1])
     _wait_for_element(spider, "//canvas")
     history_data = spider.webdriver.execute_script('''return flotChart.oldData''')
+    logging.info(f'Successfully fetched history data on {good_url}.')
 
     import datetime as dt
     for data in history_data:
@@ -111,16 +121,12 @@ def get_history_price_on_mmb(spider: Spider, good_name: str, good_url: str, good
         data_manager.add_good(name=good_name, price=data[1], date=date, platform=good_platform)
 
 
-def get_history_price_on_mmb_direct(spider: Spider, name: str, url: str, load_cookies: bool = False):
-    website_url = 'https://www.manmanbuy.com/'
-    cookies_path = Path('web_scraping/cookies/manmanbuy_cookies.json')
-
-    if load_cookies:
-        _load_cookies(spider, cookies_path, website_url)
-
+@require_mmb_cookies
+def get_history_price_on_mmb_direct(spider: Spider, name: str, url: str):
     spider.get(url)
     _wait_for_element(spider, "//canvas")
     history_data = spider.webdriver.execute_script('''return flotChart.oldData''')
+    logging.info(f'Successfully fetched history data directly on {url}.')
 
     import datetime as dt
     for data in history_data:
@@ -147,6 +153,7 @@ def get_history_price_on_hp(spider: Spider, good_name: str, url: str, good_platf
     var plot = $('#container').data('plot');
     if (!plot) return null;
     return plot.getData()[0].data;''')
+    logging.info(f'Successfully fetched history data on {url}.')
 
     import datetime as dt
     for data in history_data:

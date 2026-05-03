@@ -31,7 +31,7 @@ parser.add_argument('--version', action='version', version='WebScraping Preview 
 if __name__ == '__main__':
     program_args = parser.parse_args()
 
-    log_format = "%(asctime)s : %(levelname)-7s : %(name)-7s : %(message)s"
+    log_format = "%(asctime)s : %(levelname)s : %(name)s" + "\n" + "%(message)s"
     if program_args.debug:
         logging.basicConfig(format=log_format, level=logging.INFO)
         logging.warning(f'Debug mode is active. Your search requirement may be ignored.')

@@ -41,7 +41,7 @@ class GoodManager:
             self.database.execute(command, data)
         except sqlite3.IntegrityError as err:
             # Goods.ID doesn't match UNIQUE requirement.
-            logging.warning(f'IntegrityError: {err.sqlite_errorname}')
+            logging.debug(f'The same good is already in database.')
             pass
 
 
